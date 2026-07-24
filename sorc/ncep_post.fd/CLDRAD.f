@@ -93,6 +93,11 @@
 !> 2026-03-09 | Eric James        | Add column-integrated total dust and mass-weighted aerosol centroid
 !>                                     height, and scale FRP to be in Watts (consistent with GRIB2
 !>                                     field definition).
+!> 2026-07-23 | Gang Zhao         | Only for 3DRTMA, when calculating field 260 for Cloud Ceiling Height (CCH), providing two algorithms
+!>                                | to compute the cloud base height (array CLDZ260)
+!>                                | 1) i_cch260_rtma = 1, using the same cloud base height computed with GSD legacy
+!>                                !    cloud ceiling algorithm as used for field 408
+!>                                | 2) i_cch260_rtma !=1, using the cloud base height computed with original Ferrier Feb'02 algorithm
 !>
 !> @author Russ Treadon W/NP2 @date 1993-08-30
 !---------------------------------------------------------------------------------
@@ -137,7 +142,7 @@
                             TCLOD, ARDSW, TRDSW, ARDLW, NBIN_DU, TRDLW, IM,   &
                             NBIN_SS, NBIN_OC,NBIN_BC,NBIN_SU,NBIN_NO3,DTQ2,   &
                             JM, LM, gocart_on, gccpp_on, nasa_on, me, rdaod,  &
-                            ISTA, IEND,aqf_on,TSRFC
+                            ISTA, IEND,aqf_on,TSRFC, i_cch260_rtma
       use rqstfld_mod, only: IGET, ID, LVLS, IAVBLFLD
       use gridspec_mod, only: dyval, gridtype
       use cmassi_mod,  only: TRAD_ice
@@ -158,7 +163,7 @@
                                          ITOPT, ITOPCu, ITOPDCu, ITOPSCu, ITOPGr
       REAL,dimension(im,jm)           :: GRID1
       REAL,dimension(ista:iend,jsta:jend)    :: GRID2, EGRID1, EGRID2, EGRID3,      &
-                                         CLDP, CLDZ, CLDT, CLDZCu
+                                         CLDP, CLDZ, CLDT, CLDZCu, CLDZ260
       REAL,dimension(lm)       :: RHB, watericetotal, pabovesfc
       REAL   :: watericemax, wimin, zcldbase, zcldtop, zpbltop,              &
                 rhoice, coeffp, exponfp, const1,                             &
@@ -1882,6 +1887,7 @@ snow_check:   IF (QQS(I,J,L)>=QCLDmin) THEN
                  CLDZ(I,J) = -5000.
                ENDIF       !--- End IF (IBOT <= 0) ...
             ENDIF
+            CLDZ260(I,J) = CLDZ(I,J)       ! using cloud base height computed with Ferrier's algorithm
           ENDDO         !--- End DO I loop
         ENDDO           !--- End DO J loop
 !   CLOUD BOTTOM PRESSURE
@@ -2149,6 +2155,15 @@ snow_check:   IF (QQS(I,J,L)>=QCLDmin) THEN
                 GRID1(I,J) = CLDZ(I,J)
               ENDDO
             ENDDO
+!!$omp parallel do private(i,j)
+            IF ( i_cch260_rtma == 1 ) then
+              DO J=JSTA,JEND
+              DO I=ISTA,IEND
+                CLDZ260(I,J) = CLDZ(I,J)    ! for CCH 260, using the same cloud base height computed
+                                            ! with GSD legacy algorithm as used for 408
+              ENDDO
+              ENDDO
+            END IF
                if(grib=="grib2" )then
                  cfld=cfld+1
                  fld_info(cfld)%ifld=IAVBLFLD(IGET(408))
@@ -2450,7 +2465,11 @@ snow_check:   IF (QQS(I,J,L)>=QCLDmin) THEN
  
 !    B. ZHOU: CEILING
         IF (IGET(260)>0) THEN
-            CALL CALCEILING(CLDZ,TCLD,CEILING)
+            IF ( MODELNAME == "RAPR" .and. SUBMODELNAME == "RTMA" ) then
+              CALL CALCEILING(CLDZ260,TCLD,CEILING)
+            ELSE
+              CALL CALCEILING(CLDZ,TCLD,CEILING)
+            END IF
             DO J=JSTA,JEND
               DO I=ISTA,IEND
                GRID1(I,J) = CEILING(I,J)

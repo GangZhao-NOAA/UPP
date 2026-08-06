@@ -495,7 +495,7 @@
 !>     
 !> @author Binbin Zhou NCEP/EMC  @date 2005-08-18       
 !> @modification history:
-!>    2026-07-24 | Gang Zhao      | using height above seal level for RTMA
+!>    2026-07-24 | Gang Zhao      | using height above sea level for RTMA
       SUBROUTINE CALCEILING (CLDZ,TCLD,CEILING)
       USE vrbls2d, only: fis
       use params_mod, only: small, gi
@@ -519,8 +519,8 @@
           ELSE IF(TCLD(I,J) >= 50.) THEN
             if(MODELNAME == 'RAPR')then
               if(SUBMODELNAME == 'RTMA')then
-!               CEILING(I,J) = CLDZ(I,J) ! using height ASL for RTMA (including HRRR-based 3DRTMA)
                 CEILING(I,J) = CLDZ(I,J) - FIS(I,J)*GI  ! only to keep RT passing for 3drtma temporarily
+!               CEILING(I,J) = CLDZ(I,J) ! using height ASL for RTMA (including HRRR-based 3DRTMA)
               else
                 CEILING(I,J) = CLDZ(I,J) - FIS(I,J)*GI
               end if
